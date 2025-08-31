@@ -1,0 +1,459 @@
+import moment from "jalali-moment";
+import StringUtils from "./stringUtils";
+import {isNaN} from "formik";
+import React, {ChangeEvent, KeyboardEvent, ReactNode} from "react";
+import {MessageTypeEnums} from "../model/enums/MessageTypeEnums";
+import DialogComponent from "../components/app-data-dialog/Dialog";
+import {AlertColor} from "@mui/material/Alert/Alert";
+import CopyComponent from "../components/app-data-copy-clipboard/CopyComponent";
+import {ICopyProps} from "../model/interfaces/ICopyProps";
+import {IdentityTypesEnums} from "../model/enums/IdentityTypesEnums";
+import {CustomerTypeEnums} from "../model/enums/CustomerTypeEnums";
+
+export default class CommonUtils {
+    public static convertMiladiDateToPersianDate = (date: number): string => {
+        const temp = new Date(date);
+        const persianDate = moment(temp).locale('fa').format('YYYY/M/D');
+        return persianDate;
+    }
+
+    public static ValidateCardNumber = (cardNumber: number): boolean => {
+        if (cardNumber.toString().trim().length !== 16) return false;
+        if (!this.isNumber(cardNumber)) return false;
+        let c = parseInt(cardNumber.toString().substring(15), 10);
+        let s = 0;
+        let k, d;
+        for (let i = 0; i < 16; i++) {
+            k = (i % 2 == 0) ? 2 : 1;
+            d = parseInt(cardNumber.toString().substring(i, i + 1), 10) * k;
+            s += (d > 9) ? d - 9 : d;
+        }
+        return ((s % 10) == 0);
+    }
+
+    public static ValidateNationCode = (nationalCode: string): boolean => {
+        if (StringUtils.isNullOrEmpty(nationalCode)) {
+            return false
+        }
+        //در صورتی که کد ملی وارد شده طولش کمتر از 10 رقم باشد
+        if (nationalCode.trim().length != 10) {
+            return false
+        }
+        //در صورتی که کد ملی ده رقم عددی نباشد
+        const nationalCodeRegxPattern = /^[0-9]{10}$/;
+        if (!nationalCode.match(nationalCodeRegxPattern)) {
+            return false
+        }
+        // کد ملی های با ارقام تکراری
+        const repeatNationalCodeRegxPattern = /^([0-9])\1*$/;
+        if (nationalCode.match(repeatNationalCodeRegxPattern)) {
+            return false;
+        }
+        const c = parseInt(nationalCode.charAt(9));
+        const n = parseInt(nationalCode.charAt(0)) * 10 + parseInt(nationalCode.charAt(1)) * 9 + parseInt(nationalCode.charAt(2)) * 8
+            + parseInt(nationalCode.charAt(3)) * 7 + parseInt(nationalCode.charAt(4)) * 6 + parseInt(nationalCode.charAt(5)) * 5
+            + parseInt(nationalCode.charAt(6)) * 4 + parseInt(nationalCode.charAt(7)) * 3 + parseInt(nationalCode.charAt(8)) * 2;
+        const r = n - parseInt((n / 11).toString()) * 11;
+        if ((r == 0 && r == c) || (r == 1 && c == 1) || (r > 1 && c == 11 - r)) {
+            return true
+        } else {
+            return false
+        }
+    }
+
+    public static ValidateMobileNumber = (mobileNumber: string): boolean => {
+        if (mobileNumber.trim().length !== 11 || mobileNumber.trim().substring(0, 2) !== '09') {
+            return false;
+        }
+        return true
+    }
+
+    public static ValidatePersianDateNumbers = (DateNumber: number): boolean => {
+        const MinYear = 1300;
+        const MaxYear = 1500;
+        const MinMonth = 1;
+        const MaxMonth = 12;
+        const MinDay = 1;
+        const Month31Day = [1, 2, 3, 4, 5, 6]
+        const Month30Day = [7, 8, 9, 10, 11]
+        const MaxDay29 = 29;
+        const MaxDay30 = 30;
+        const MaxDay31 = 31;
+
+        if (!this.isNumber(DateNumber) || DateNumber.toString().length !== 8) return false;
+
+        const Year = Number(DateNumber.toString().substring(0, 4));
+        const Month = Number(DateNumber.toString().substring(4, 6));
+        const Day = Number(DateNumber.toString().substring(6, 8));
+
+        if (Year > MaxYear || Year < MinYear) {
+            return false;
+        }
+
+        if (Month > MaxMonth || Month < MinMonth) {
+            return false;
+        }
+
+        if (Day < MinDay) {
+            return false;
+        }
+
+        if (Month31Day.includes(Month) && Day > MaxDay31) {
+            return false;
+        }
+
+        if ((Month30Day.includes(Month) || this.isLeapYear(Year)) && Day > MaxDay30) {
+            return false;
+        }
+
+        if (!this.isLeapYear(Year) && Day > MaxDay29) {
+            return false;
+        }
+
+        return true
+    }
+
+    public static isNumber = (str: any): boolean => {
+        if (str.toString().trim() === '') {
+            return false;
+        }
+
+        return !isNaN(str);
+    }
+
+    public static isLeapYear = (year: number) => {
+        const leapOffset = [4, 37, 66, 99, 132, 165, 198, 231, 264, 297, 326
+            , 359, 392, 425, 458, 491, 524, 553, 586, 619, 656, 685, 718, 751, 784, 817
+            , 850, 883, 916, 949, 978, 1011, 1044, 1077, 1110, 1143, 1176, 1209, 1238
+            , 1275, 1308, 1343, 1370, 1401, 1436, 1473, 1502];
+
+        let k = 0;
+        for (let i = 0; i <= year; i += 4) {
+            if (i > leapOffset[k]) {
+                i++;
+                k++;
+            }
+            if (year == i) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static toCardFormat = (cardNumber: string): string => {
+        if (!cardNumber) {
+            return ''
+        }
+        return cardNumber.replace(/[^0-9]/g, "").substr(0, 16).split("").reduce(cardFormat, "");
+
+        function cardFormat(str: string, l: string, i: number) {
+            return str + ((!i || (i % 4)) ? "" : "-") + l;
+        }
+    };
+
+    public static toPriceFormat = (n: string | number | null): string => {
+        if (n === undefined || isNaN(n) || n === null) {
+            return ''
+        }
+        let parts = n.toString().split(".");
+        const numberPart = parts[0];
+        const decimalPart = parts[1];
+        const thousands = /\B(?=(\d{3})+(?!\d))/g;
+        return numberPart.replace(thousands, ",") + (decimalPart ? "." + decimalPart : "");
+    }
+
+    // input value: 14021225    output value: 1402/12/25
+    public static toPersianDateFormat = (date: string): string => {
+        if (!date || date?.length !== 8) {
+            return ''
+        }
+        return date.substring(0, 4) + "/" + date.substring(4, 6) + "/" + date.substring(6, 8);
+    };
+
+    public static getAllNumbersFromString = (stringText: object): number => {
+
+        if (stringText.toString().length === 0) {
+            return 0
+        }
+
+        const numsStr = stringText.toString().replace(/[^0-9]/g, '');
+        return parseInt(numsStr);
+    }
+
+    public static isObjectEmpty = (objectName: Object): boolean => {
+        return (
+            objectName === undefined ||
+            Object.keys(objectName).length === 0
+        );
+    };
+
+    public static renderState = (state?: boolean, positiveTitle: string = 'بلی', negativeTitle: string = 'خیر'): ReactNode => {
+        return React.createElement('label', null,
+            React.createElement('span', {className: `state-${state ? 'active' : 'danger'}`},
+                [React.createElement('span', {className: `material-icons-outlined icon-16px text-${state ? 'active' : 'danger'}`}, state ? 'check_circle' : 'cancel'),
+                    React.createElement('span', {className: `tabItem-value text-${state ? 'active' : 'danger'}`}, state ? positiveTitle : negativeTitle)]
+            )
+        );
+    }
+
+    public static getMessageTypeHttpStatus = (status: number): MessageTypeEnums => {
+        switch (true) {
+            case Number(status) === 200 :
+            case Number(status) === 201:
+                return MessageTypeEnums.Success;
+            default:
+                return MessageTypeEnums.Error;
+        }
+    }
+
+    public static getMessageTypeStatus = (state: string): MessageTypeEnums | string => {
+        switch (state) {
+            case "SEVERITY_SUCCESS" : {
+                return (
+                    MessageTypeEnums.Success
+                )
+            }
+            case "SEVERITY_INFO" : {
+                return (
+                    MessageTypeEnums.Info
+                )
+            }
+            case "SEVERITY_WARN" : {
+                return (
+                    MessageTypeEnums.Warning
+                )
+            }
+            case "SEVERITY_ERROR" : {
+                return (
+                    MessageTypeEnums.Error
+                )
+            }
+            default:
+                return ""
+        }
+    }
+
+    public static searchTable = (tableId: string, searchColumns: string[], searchTextClass: string): ReactNode => {
+        const searchInput = document.getElementsByClassName(searchTextClass)[0];
+        searchInput?.addEventListener('input', (e) => {
+            const tableRows = document.getElementById(tableId)?.querySelectorAll('tbody tr');
+            const classSelector: string = searchColumns.map(item => '.' + item).join(',');
+            const searchInputValue = (e?.target as HTMLInputElement).value.toLowerCase().trim();
+            tableRows?.forEach(row => {
+                const resultText: string = Array.from(row.querySelectorAll(classSelector)).map(obj => obj.textContent).join('');
+                const doesRowMatch = resultText?.toString().toLowerCase().trim().includes(searchInputValue.toLowerCase().trim());
+                if (doesRowMatch) {
+                    return (row as HTMLTableRowElement).style.display = 'table-row';
+                } else {
+                    return (row as HTMLTableRowElement).style.display = 'none';
+                }
+            })
+        })
+        return null
+    }
+
+    public static removeFalseValuesFromArray = (array: any): any => {
+        const results = (array as any[]).filter(element => {
+            return element !== null && element !== undefined;
+        });
+        return results;
+    }
+
+    public static showDialog = (open: boolean, onClose: any, dialogTitle?: ReactNode, startIcon?: ReactNode,
+                                startIconTitle?: ReactNode, dialogContent?: ReactNode,
+                                dialogContentMessageDetail?: ReactNode, dialogContentAlertMessage?: ReactNode,
+                                dialogButton?: ReactNode, CancelButtonTitle?: string | null, severity?: AlertColor, enableCloseIcon?: boolean, onCancel?: any): ReactNode => {
+        return (
+            React.createElement(DialogComponent, {
+                open: open,
+                onClose: onClose,
+                dialogTitle: dialogTitle,
+                startIcon: startIcon,
+                startIconTitle: startIconTitle,
+                dialogContent: dialogContent,
+                dialogContentMessageDetail: dialogContentMessageDetail,
+                dialogContentAlertMessage: dialogContentAlertMessage,
+                dialogButton: dialogButton,
+                cancelButtonTitle: CancelButtonTitle,
+                severity: severity,
+                enableCloseIcon: enableCloseIcon,
+                onCancel: onCancel
+            }, '')
+        )
+    }
+
+    public static async copyToClipboard(copyValue: string, elementIndex: number = 0) {
+        let copyText = document.querySelectorAll(".copy-text")[elementIndex];
+        copyText?.classList.add("active");
+
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(copyValue);
+        } else {
+            const textArea = document.createElement("textarea");
+            textArea.value = copyValue;
+
+            textArea.style.position = "absolute";
+            textArea.style.left = "-999999px";
+
+            document.body.prepend(textArea);
+            textArea.focus();
+            document.execCommand('selectAll');
+
+            try {
+                document.execCommand('copy');
+            } catch (error) {
+                console.error(error);
+            } finally {
+                textArea.remove();
+            }
+        }
+
+        setTimeout(function () {
+            copyText?.classList.remove("active");
+        }, 1600);
+    }
+
+    public static preventClickJacking = (): void => {
+        if (typeof window !== 'undefined') {
+            try {
+                if (window?.top !== window?.self) {
+                    console.error('ClickJacking attempt detected!');
+                    // @ts-ignore
+                    window["top"].location = window["self"].location;
+                }
+            } catch (e) {
+                console.error('Unable to access window.top due to cross-origin restrictions:', e);
+            }
+        }
+    }
+
+    public static checkPersianCharacter = (e: KeyboardEvent<HTMLInputElement>): void => {
+        const persianRegex = /[\u0600-\u06FF\uFB50-\uFDFF]/;
+        if (e.code === "Space" || persianRegex.test(e.key)) {
+            return;
+        }
+        e.preventDefault();
+    }
+
+    public static isPersianCharacter = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): boolean => {
+        const persianRegex = /[\u0600-\u06FF\uFB50-\uFDFF]/;
+        return persianRegex.test(e.target?.value);
+    }
+
+    public static checkEnglishCharacter = (e: KeyboardEvent<HTMLInputElement>): void => {
+        const englishRegex = /^[A-Za-z]*$/;
+        if (e.code === "Space" || englishRegex.test(e.key)) {
+            return;
+        }
+        e.preventDefault();
+    }
+
+    public static isEnglishCharacter = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>): boolean => {
+        const englishRegex = /^[A-Za-z]*$/;
+        return englishRegex.test(e.target?.value);
+    }
+
+    public static checkNumericCharacter = (e: KeyboardEvent<HTMLInputElement>): void => {
+        const numericRegex = /^\d*$/;
+        if (numericRegex.test(e.key)) {
+            return;
+        }
+        e.preventDefault();
+    }
+
+    public static addUserDialog = (props: ICopyProps): ReactNode => {
+        return React.createElement(CopyComponent, props);
+    }
+
+    public static maskPan = (pan: string): string => {
+        return pan.slice(0, 8) + "****" + pan.slice(-4);
+    }
+
+    public static downloadFile = (fileUrl: string, fileName: string): void => {
+        let link = document.createElement("a");
+
+        link.href = fileUrl;
+
+        // link.download = fileName;
+
+        document.body.appendChild(link);
+
+        link.click();
+        setTimeout(function () {
+            window.URL.revokeObjectURL(link.toString());
+        }, 200);
+    }
+
+    public static validateExcelColumns = (requiredColumn: string[], column: string[]): string[] => {
+        const invalidColumns: string[] = requiredColumn.filter((col: string) => !column.includes(col));
+        return invalidColumns;
+    }
+
+    public static isUndefinedExcelRecords = (obj: string[]): string[] => {
+        const cleaned = obj.filter(obj =>
+            Object.values(obj).some(val => val !== undefined)
+        );
+        return cleaned;
+    }
+
+    public static findObjectByProperty = (arr: any[], propertyName: string, value: string): any | undefined => {
+        return arr?.find(obj => obj[propertyName] === value);
+    }
+
+    public static removeEmptyFieldFromObject = (Obj: Object): any => {
+        const filteredValues = Object.entries(Obj).reduce((acc:any, [key, value]) => {
+            if (value !== "") acc[key] = value;
+            return acc;
+        }, {});
+        return filteredValues;
+    }
+
+    public static findCustomerTypeFromCustomerGroup =(customerGroup : String):string=>{
+        let customerType : string='';
+        switch (customerGroup.toLowerCase()) {
+            case CustomerTypeEnums.Personal:
+                customerType = 'کد ملی';
+                break;
+            case CustomerTypeEnums.Corporate :
+                customerType = 'شناسه حقوقی';
+                break;
+            case CustomerTypeEnums.Foreigner:
+                customerType = 'کد اتباع';
+                break;
+            default:
+                break;
+        }
+        return customerType
+    }
+
+    public static isEnglishChar =  (e: React.KeyboardEvent<HTMLInputElement>) : boolean => {
+        const key = e.key;
+
+        const editingKeys = ["Backspace", "Delete", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "Tab", "Enter"];
+
+        const blockedKeys = [
+            "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
+            "PrintScreen", "ScrollLock", "Pause", "Insert", "PageUp", "PageDown",
+            "Home", "End", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+            "CapsLock", "NumLock", "Control", "Alt", "Shift", "Meta"
+        ];
+
+        const allowedRegex = /^[a-zA-Z0-9 !@#$%^&*()_+\-=[\]{};':",.<>/?\\|`~]$/;
+
+        if (editingKeys.includes(key)) {
+            return true;
+        }
+
+        if (blockedKeys.includes(key)) {
+            e.preventDefault();
+            return true;
+        }
+
+        if (!allowedRegex.test(key)) {
+            e.preventDefault();
+            return false;
+        }
+
+        return /^[\u0000-\u007F]$/.test(key);
+    }
+}
